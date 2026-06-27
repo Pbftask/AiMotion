@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>AI Video Generator</title>
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111">
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+-webkit-tap-highlight-color:transparent;
+}
+
+body{
+background:#050505;
+font-family:Arial,sans-serif;
+color:#fff;
+min-height:100vh;
+overflow-x:hidden;
+}
+
+body::before{
+content:"";
+position:fixed;
+inset:0;
+background:
+radial-gradient(circle at top,#ff4d4d22,transparent 35%),
+radial-gradient(circle at bottom,#ff950022,transparent 35%);
+pointer-events:none;
+}
+
+.title{
+text-align:center;
+font-size:28px;
+font-weight:700;
+margin-top:35px;
+letter-spacing:1px;
+}
+
+.status{
+text-align:center;
+color:#aaa;
+margin-top:10px;
+padding:0 20px;
+}
+
+#preview{
+display:flex;
+justify-content:center;
+flex-wrap:wrap;
+gap:10px;
+padding:20px;
+}
+
+#preview img{
+width:85px;
+height:85px;
+object-fit:cover;
+border-radius:15px;
+border:2px solid #222;
+}
+
+audio{
+display:none;
+width:40%;
+margin:10px auto;
+}
+
+.ai-card{
+width:92%;
+max-width:450px;
+margin:20px auto;
+background:rgba(255,255,255,.05);
+backdrop-filter:blur(20px);
+border:1px solid rgba(255,255,255,.08);
+border-radius:25px;
+padding:25px;
+display:none;
+}
+
+.ai-circle{
+width:150px;
+height:150px;
+margin:auto;
+border-radius:50%;
+display:flex;
+align-items:center;
+justify-content:center;
+background:
+radial-gradient(circle,
+rgba(255,80,80,.3),
+transparent 70%);
+}
+
+.ai-circle span{
+font-size:42px;
+font-weight:700;
+}
+
+#step{
+text-align:center;
+margin-top:20px;
+color:#aaa;
+min-height:20px;
+}
+
+.progress-wrap{
+margin-top:20px;
+height:10px;
+background:#1a1a1a;
+border-radius:99px;
+overflow:hidden;
+}
+
+#progress{
+width:0%;
+height:100%;
+border-radius:99px;
+background:
+linear-gradient(
+90deg,
+#ff0000,
+#ff9500
+);
+box-shadow:
+0 0 20px #ff0000,
+0 0 30px #ff9500;
+}
+
+video{
+display:none;
+width:92%;
+max-width:200px;
+margin:20px auto;
+border-radius:15px;
+}
+
+.bottom{
+position:fixed;
+left:50%;
+bottom:25px;
+transform:translateX(-50%);
+background:#1a1a1a;
+padding:12px;
+border-radius:50px;
+display:flex;
+gap:15px;
+box-shadow:0 0 20px rgba(255,255,255,.05);
+}
+
+.btn{
+width:58px;
+height:58px;
+border-radius:50%;
+display:flex;
+justify-content:center;
+align-items:center;
+background:
+linear-gradient(
+135deg,
+#f00,
+#ff9500
+);
+font-size:22px;
+cursor:pointer;
+transition:.2s;
+}
+
+.btn:active{
+transform:scale(.92);
+}
+
+input{
+display:none;
+}
+
+</style>
+</head>
+<body>
+
+<div class="title">
+AI MOTION
+</div>
+
+<div class="status" id="status">
+Pilih foto dan audio
+</div>
+
+<div id="preview"></div>
+
+<div class="ai-card" id="aiCard">
+
+<div class="ai-circle">
+<span id="percent">0%</span>
+</div>
+
+<div id="step">
+Initializing AI...
+</div>
+
+<div class="progress-wrap">
+<div id="progress"></div>
+</div>
+
+</div>
+
+<video id="videoResult" controls loop>
+<source id="videoSource">
+</video>
+
+<div class="bottom">
+
+<label class="btn">
+<i class="fa-solid fa-music"></i>
+<input
+type="file"
+id="audioInput"
+accept="audio/*">
+</label>
+
+<label class="btn">
+<i class="fa-solid fa-plus"></i>
+<input
+type="file"
+id="photoInput"
+accept="image/*"
+multiple>
+</label>
+
+<div class="btn"
+onclick="generateVideo()">
+<i class="fa-solid fa-paper-plane"></i>
+</div>
+
+</div>
+
+<script>
+const audioInput = document.getElementById("audioInput");
+const photoInput = document.getElementById("photoInput");
+const preview = document.getElementById("preview");
+const status = document.getElementById("status");
+const aiCard = document.getElementById("aiCard");
+const percent = document.getElementById("percent");
+const progress = document.getElementById("progress");
+const step = document.getElementById("step");
+const videoResult = document.getElementById("videoResult");
+const videoSource = document.getElementById("videoSource");
+
+let photos = [];
+let audio = null;
+
+const videos = [
+    "video1.mp4"
+];
+
+const steps = [
+    "Scanning photos...",
+    " Detecting faces...",
+    " Building motion model...",
+    "creating animation...",
+    "generating frames...",
+    "Syncing audio...",
+    "Rendering final video..."
+];
+
+audioInput.addEventListener("change", (e)=>{
+
+    audio = e.target.files[0];
+
+    if(audio){
+        updateStatus();
+    }
+
+});
+
+photoInput.addEventListener("change", (e)=>{
+
+    const files = [...e.target.files];
+
+    files.forEach(file=>{
+
+        if(photos.length < 5){
+            photos.push(file);
+        }
+
+    });
+
+    if(photos.length > 5){
+
+        photos = photos.slice(0,5);
+
+        alert("Maksimal 5 foto");
+
+    }
+
+    renderPreview();
+    updateStatus();
+
+});
+
+function renderPreview(){
+
+    preview.innerHTML = "";
+
+    photos.forEach((file,index)=>{
+
+        const img = document.createElement("img");
+
+        img.src = URL.createObjectURL(file);
+
+        img.onclick = ()=>{
+
+            photos.splice(index,1);
+
+            renderPreview();
+            updateStatus();
+
+        };
+
+        preview.appendChild(img);
+
+    });
+
+}
+
+function updateStatus(){
+
+    status.innerHTML =
+    "📸 " + photos.length + "/5 Foto<br>" +
+    (audio
+    ? "🎵 " + audio.name
+    : "🎵 Belum ada audio");
+
+}
+
+function generateVideo(){
+
+    if(photos.length === 0){
+
+        alert("Pilih minimal 1 foto");
+
+        return;
+
+    }
+
+    aiCard.style.display = "block";
+
+    videoResult.style.display = "none";
+
+    progress.style.width = "0%";
+
+    percent.innerHTML = "0%";
+
+    let p = 0;
+    let stepIndex = 0;
+
+    step.innerHTML = steps[0];
+
+    function updateProgress(){
+
+        if(p >= 100){
+
+            finishGenerate();
+            return;
+
+        }
+
+        p += Math.floor(Math.random()*3)+1;
+
+        if(p > 100){
+            p = 100;
+        }
+
+        percent.innerHTML = p + "%";
+
+        progress.style.width = p + "%";
+
+        if(p > 10 && p % 15 < 3){
+
+            if(stepIndex < steps.length-1){
+                stepIndex++;
+            }
+
+            step.innerHTML = steps[stepIndex];
+
+        }
+
+        let delay;
+
+        if(p < 60){
+
+            delay = 80;
+
+        }else if(p < 90){
+
+            delay = 250;
+
+        }else{
+
+            delay = 800;
+
+        }
+
+        setTimeout(updateProgress,delay);
+
+    }
+
+    updateProgress();
+
+}
+
+function finishGenerate(){
+
+    aiCard.style.display = "none";
+
+    const randomVideo =
+    videos[Math.floor(
+        Math.random()*videos.length
+    )];
+
+    videoSource.src = randomVideo;
+
+    videoResult.load();
+
+    videoResult.style.display = "block";
+
+    videoResult.loop = true;
+
+    videoResult.play().catch(()=>{});
+
+    status.innerHTML =
+    "Video berhasil dibuat";
+
+}
+
+window.generateVideo = generateVideo;
+</script>
+
+</body>
+</html>
